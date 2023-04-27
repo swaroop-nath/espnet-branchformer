@@ -219,7 +219,7 @@ class BranchformerEncoderLayer(torch.nn.Module):
                 ):
                     # Drop the attn branch
                     w1, w2 = 0.0, 1.0
-                if (
+                elif (
                     self.training
                     and self.cgmlp_branch_drop_rate > 0
                     and torch.rand(1).item() < self.cgmlp_branch_drop_rate
@@ -233,8 +233,8 @@ class BranchformerEncoderLayer(torch.nn.Module):
                     )  # (batch, 1, time)
                     if mask is not None:
                         min_value = float(
-                            numpy.finfo(
-                                torch.tensor(0, dtype=score1.dtype).numpy().dtype
+                            torch.finfo(
+                                score1.dtype
                             ).min
                         )
                         score1 = score1.masked_fill(mask.eq(0), min_value)
@@ -252,8 +252,8 @@ class BranchformerEncoderLayer(torch.nn.Module):
                     )  # (batch, 1, time)
                     if mask is not None:
                         min_value = float(
-                            numpy.finfo(
-                                torch.tensor(0, dtype=score2.dtype).numpy().dtype
+                            torch.finfo(
+                                score2.dtype
                             ).min
                         )
                         score2 = score2.masked_fill(mask.eq(0), min_value)
@@ -274,9 +274,14 @@ class BranchformerEncoderLayer(torch.nn.Module):
                     )  # (batch, 2, 1, 1)
                     w1, w2 = merge_weights[:, 0], merge_weights[:, 1]  # (batch, 1, 1)
 
-                x = x + stoch_layer_coeff * self.dropout(
-                    self.merge_proj(w1 * x1 + w2 * x2)
-                )
+                if self.training:
+                    x = x + stoch_layer_coeff * self.dropout(
+                        self.merge_proj(w1 * x1 + w2 * x2)
+                    )
+                else: # Getting expected activations during inference
+                    x = x + stoch_layer_coeff * self.dropout(
+                        self.merge_proj(w1 * x1 * (1 - self.attn_branch_drop_rate) + w2 * x2 * (1 - self.cgmlp_branch_drop_rate))
+                    )
             elif self.merge_method == "fixed_ave":
                 x = x + stoch_layer_coeff * self.dropout(
                     self.merge_proj(
@@ -322,6 +327,7 @@ class BranchformerEncoder(AbsEncoder):
         merge_method: str = "concat",
         cgmlp_weight: Union[float, List[float]] = 0.5,
         attn_branch_drop_rate: Union[float, List[float]] = 0.0,
+        cgmlp_branch_drop_rate: Union[float, List[float]] = 0.0,
         num_blocks: int = 12,
         dropout_rate: float = 0.1,
         positional_dropout_rate: float = 0.1,
@@ -488,9 +494,19 @@ class BranchformerEncoder(AbsEncoder):
 
         if isinstance(attn_branch_drop_rate, float):
             attn_branch_drop_rate = [attn_branch_drop_rate] * num_blocks
+
+        if isinstance(cgmlp_branch_drop_rate, float):
+            cgmlp_branch_drop_rate = [cgmlp_branch_drop_rate] * num_blocks
+    
         if len(attn_branch_drop_rate) != num_blocks:
             raise ValueError(
                 f"Length of attn_branch_drop_rate ({len(attn_branch_drop_rate)}) "
+                f"should be equal to num_blocks ({num_blocks})"
+            )
+
+        if len(cgmlp_branch_drop_rate) != num_blocks:
+            raise ValueError(
+                f"Length of cgmlp_branch_drop_rate ({len(attn_branch_drop_rate)}) "
                 f"should be equal to num_blocks ({num_blocks})"
             )
 
@@ -506,6 +522,7 @@ class BranchformerEncoder(AbsEncoder):
                 merge_method,
                 cgmlp_weight[lnum],
                 attn_branch_drop_rate[lnum],
+                cgmlp_branch_drop_rate[lnum],
                 stochastic_depth_rate[lnum],
             ),
         )
