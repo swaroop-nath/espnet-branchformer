@@ -71,6 +71,7 @@ class BranchformerEncoderLayer(torch.nn.Module):
         merge_method: str,
         cgmlp_weight: float = 0.5,
         attn_branch_drop_rate: float = 0.0,
+        cgmlp_branch_drop_rate: float = 0.0,
         stochastic_depth_rate: float = 0.0,
     ):
         super().__init__()
@@ -84,6 +85,7 @@ class BranchformerEncoderLayer(torch.nn.Module):
         self.merge_method = merge_method
         self.cgmlp_weight = cgmlp_weight
         self.attn_branch_drop_rate = attn_branch_drop_rate
+        self.cgmlp_branch_drop_rate = cgmlp_branch_drop_rate
         self.stochastic_depth_rate = stochastic_depth_rate
         self.use_two_branches = (attn is not None) and (cgmlp is not None)
 
@@ -217,6 +219,13 @@ class BranchformerEncoderLayer(torch.nn.Module):
                 ):
                     # Drop the attn branch
                     w1, w2 = 0.0, 1.0
+                if (
+                    self.training
+                    and self.cgmlp_branch_drop_rate > 0
+                    and torch.rand(1).item() < self.cgmlp_branch_drop_rate
+                ):
+                    # Drop the CGMLP branch
+                    w1, w2 = 1.0, 0.0
                 else:
                     # branch1
                     score1 = (
