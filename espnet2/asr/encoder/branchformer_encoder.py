@@ -21,6 +21,7 @@ from typeguard import check_argument_types
 from espnet2.asr.encoder.abs_encoder import AbsEncoder
 from espnet2.asr.layers.cgmlp import ConvolutionalGatingMLP
 from espnet2.asr.layers.fastformer import FastSelfAttention
+from espnet2.asr.layers.bigbird_attention import LinearRandomAttention
 from espnet.nets.pytorch_backend.nets_utils import make_pad_mask
 from espnet.nets.pytorch_backend.transformer.attention import (  # noqa: H301
     LegacyRelPositionMultiHeadedAttention,
@@ -184,6 +185,8 @@ class BranchformerEncoderLayer(torch.nn.Module):
             x1 = self.norm_mha(x1)
 
             if isinstance(self.attn, FastSelfAttention):
+                x_att = self.attn(x1, mask)
+            if isinstance(self.attn, LinearRandomAttention):
                 x_att = self.attn(x1, mask)
             else:
                 if pos_emb is not None:
@@ -357,10 +360,10 @@ class BranchformerEncoder(AbsEncoder):
         elif pos_enc_layer_type == "scaled_abs_pos":
             pos_enc_class = ScaledPositionalEncoding
         elif pos_enc_layer_type == "rel_pos":
-            assert attention_layer_type == "rel_selfattn"
+            assert attention_layer_type == "rel_selfattn" or attention_layer_type == 'bigbird_random'
             pos_enc_class = RelPositionalEncoding
         elif pos_enc_layer_type == "legacy_rel_pos":
-            assert attention_layer_type == "legacy_rel_selfattn"
+            assert attention_layer_type == "legacy_rel_selfattn"  or attention_layer_type == 'bigbird_random'
             pos_enc_class = LegacyRelPositionalEncoding
             logging.warning(
                 "Using legacy_rel_pos and it will be deprecated in the future."
@@ -462,6 +465,16 @@ class BranchformerEncoder(AbsEncoder):
                 output_size,
                 attention_heads,
                 attention_dropout_rate,
+            )
+        elif attention_layer_type == "bigbird_random":
+            encoder_selfattn_layer = LinearRandomAttention
+            encoder_selfattn_layer_args = (
+                output_size,
+                attention_heads,
+                "block_sparse",
+                2, # random block size
+                10, # number of random blocks
+                attention_dropout_rate
             )
         else:
             raise ValueError("unknown encoder_attn_layer: " + attention_layer_type)
