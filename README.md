@@ -74,6 +74,21 @@ We employ the BigBird based random attention which has a linear space requiremen
 <b>Figure 2</b>: <em>Chararter Error Rate (CER) trend for the validation (_dev_) set during training for BigBird Attention based implementation.</em>
 </p>
 
+# CS 753 Evaluation Pointers
+
+Links to files that have been modified or added for experiments:
+
+1. [TRAIN BRANCHFORMER SHELL SCRIPT](https://github.com/swaroop-nath/espnet-branchformer/blob/asr-hacker/egs2/aishell/asr1/train_branchformer.sh)
+2. [TEST BRANCHFORMER SHELL SCRIPT](https://github.com/swaroop-nath/espnet-branchformer/blob/asr-hacker/egs2/aishell/asr1/test_branchformer.sh)
+3. BigBird Inspired [LINEAR RANDOM ATTENTION](https://github.com/swaroop-nath/espnet-branchformer/blob/asr-hacker/espnet2/asr/layers/bigbird_attention.py)
+4. [Branchformer Encoder](https://github.com/swaroop-nath/espnet-branchformer/blob/asr-hacker/espnet2/asr/encoder/branchformer_encoder.py)
+
+Changes to Branchformer Encoder:
+
+1. Patched the dropout discrepancy for test time.
+2. Added support for CGMLP dropout.
+3. Added support for BigBird Attention.
+
 # Credits
 
 Link to original project on github - [ESPNET](https://github.com/espnet/espnet).
